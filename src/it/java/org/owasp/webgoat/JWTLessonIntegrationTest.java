@@ -31,6 +31,13 @@ import org.jose4j.jwk.RsaJsonWebKey;
 import org.junit.jupiter.api.Test;
 import org.owasp.webgoat.lessons.jwt.JWTSecretKeyEndpoint;
 
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+
+
+
 public class JWTLessonIntegrationTest extends IntegrationTest {
 
   @Test
@@ -54,8 +61,10 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
     checkResults("/JWT/");
   }
 
-  private String generateToken(String key) {
-
+  
+private String generateToken(String key) {
+    SecretKey secretKey = generateSecureSecretKey();
+    
     return Jwts.builder()
         .setIssuer("WebGoat Token Builder")
         .setAudience("webgoat.org")
@@ -65,9 +74,20 @@ public class JWTLessonIntegrationTest extends IntegrationTest {
         .claim("username", "WebGoat")
         .claim("Email", "tom@webgoat.org")
         .claim("Role", new String[] {"Manager", "Project Administrator"})
-        .signWith(SignatureAlgorithm.HS256, key)
+        .signWith(secretKey, SignatureAlgorithm.HS512)
         .compact();
-  }
+}
+
+private SecretKey generateSecureSecretKey() {
+    try {
+        KeyGenerator keyGen = KeyGenerator.getInstance("HmacSHA512");
+        keyGen.init(512); // Specify the key size
+        return keyGen.generateKey();
+    } catch (NoSuchAlgorithmException e) {
+        throw new RuntimeException("Error generating secret key: " + e.getMessage(), e);
+    }
+}
+
 
   private String getSecretToken(String token) {
     for (String key : JWTSecretKeyEndpoint.SECRETS) {
