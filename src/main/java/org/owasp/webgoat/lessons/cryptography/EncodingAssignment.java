@@ -34,6 +34,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
+
+
+
 @RestController
 public class EncodingAssignment extends AssignmentEndpoint {
 
@@ -41,20 +46,56 @@ public class EncodingAssignment extends AssignmentEndpoint {
     return Base64.getEncoder().encodeToString(username.concat(":").concat(password).getBytes());
   }
 
-  @GetMapping(path = "/crypto/encoding/basic", produces = MediaType.TEXT_HTML_VALUE)
-  @ResponseBody
-  public String getBasicAuth(HttpServletRequest request) {
+  
+@GetMapping(path = "/crypto/encoding/basic", produces = MediaType.TEXT_HTML_VALUE)
+@ResponseBody
+public String getBasicAuth(HttpServletRequest request) {
 
     String basicAuth = (String) request.getSession().getAttribute("basicAuth");
     String username = request.getUserPrincipal().getName();
+
     if (basicAuth == null) {
-      String password =
-          HashingAssignment.SECRETS[new Random().nextInt(HashingAssignment.SECRETS.length)];
-      basicAuth = getBasicAuth(username, password);
-      request.getSession().setAttribute("basicAuth", basicAuth);
+        // Validate the username to ensure it is valid and non-malicious
+        if (!isValidUsername(username)) {
+            // Handle invalid username scenario
+            return "Invalid user";
+        }
+
+        String password = HashingAssignment.SECRETS[new Random().nextInt(HashingAssignment.SECRETS.length)];
+        basicAuth = getBasicAuth(username, password);
+
+        // Validate the generated basicAuth string
+        if (isValidBasicAuth(basicAuth)) {
+            request.getSession().setAttribute("basicAuth", basicAuth);
+        } else {
+            // Handle invalid basicAuth scenario
+            return "Invalid authorization token";
+        }
     }
+    
     return "Authorization: Basic ".concat(basicAuth);
-  }
+}
+
+// Basic validation for username
+private boolean isValidUsername(String username) {
+    // Define a regular expression for allowed username patterns
+    String regex = "^[a-zA-Z0-9._-]{3,}$";
+    Pattern pattern = Pattern.compile(regex);
+    Matcher matcher = pattern.matcher(username);
+    return matcher.matches();
+}
+
+// Basic validation for the basic authentication header
+private boolean isValidBasicAuth(String basicAuth) {
+    // Basic validation: Check if the basicAuth is Base64 encoded
+    try {
+        Base64.getDecoder().decode(basicAuth);
+        return true;
+    } catch (IllegalArgumentException e) {
+        return false;
+    }
+}
+
 
   @PostMapping("/crypto/encoding/basic-auth")
   @ResponseBody
