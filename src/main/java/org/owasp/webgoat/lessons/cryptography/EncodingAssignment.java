@@ -37,6 +37,11 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
+import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
+
+
+
 
 
 @RestController
@@ -47,21 +52,22 @@ public class EncodingAssignment extends AssignmentEndpoint {
   }
 
   
+
 @GetMapping(path = "/crypto/encoding/basic", produces = MediaType.TEXT_HTML_VALUE)
 @ResponseBody
 public String getBasicAuth(HttpServletRequest request) {
 
     String basicAuth = (String) request.getSession().getAttribute("basicAuth");
-    String username = request.getUserPrincipal().getName();
+    String username = request.getUserPrincipal() != null ? request.getUserPrincipal().getName() : null;
 
     if (basicAuth == null) {
         // Validate the username to ensure it is valid and non-malicious
-        if (!isValidUsername(username)) {
+        if (username == null || !isValidUsername(username)) {
             // Handle invalid username scenario
             return "Invalid user";
         }
 
-        String password = HashingAssignment.SECRETS[new Random().nextInt(HashingAssignment.SECRETS.length)];
+        String password = HashingAssignment.SECRETS[new SecureRandom().nextInt(HashingAssignment.SECRETS.length)];
         basicAuth = getBasicAuth(username, password);
 
         // Validate the generated basicAuth string
@@ -75,6 +81,34 @@ public String getBasicAuth(HttpServletRequest request) {
     
     return "Authorization: Basic ".concat(basicAuth);
 }
+
+private boolean isValidUsername(String username) {
+    // Example validation: username must be alphanumeric and between 3 and 20 characters
+    Pattern pattern = Pattern.compile("^[a-zA-Z0-9]{3,20}$");
+    Matcher matcher = pattern.matcher(username);
+    return matcher.matches();
+}
+
+private boolean isValidBasicAuth(String basicAuth) {
+    // Example validation: basicAuth must be a valid Base64 encoded string
+    try {
+        byte[] decodedBytes = Base64.getDecoder().decode(basicAuth);
+        String decodedString = new String(decodedBytes, StandardCharsets.UTF_8);
+        // Check if the decoded string follows the pattern of "username:password"
+        return decodedString.contains(":");
+    } catch (IllegalArgumentException e) {
+        // If decoding fails, it's not a valid Base64 string
+        return false;
+    }
+}
+
+private String getBasicAuth(String username, String password) {
+    // Combine username and password with a colon
+    String authString = username + ":" + password;
+    // Encode the combined string using Base64
+    return Base64.getEncoder().encodeToString(authString.getBytes(StandardCharsets.UTF_8));
+}
+
 
 // Basic validation for username
 private boolean isValidUsername(String username) {
